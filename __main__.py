@@ -1,3 +1,4 @@
+import math
 from jinja2 import Environment, FileSystemLoader
 from datetime import datetime
 from dateutil import parser, relativedelta
@@ -23,11 +24,13 @@ repo = requests.get(base_url + '/repos/{0}/{1}/stats/contributors'.format(userna
 
 total_commits = 0
 data = []
+contributors = []
 start_date = None
 end_date = None
 for contributor in repo.json():
     total_commits += contributor['total']
     weeks = contributor['weeks']
+    contributors.append(contributor['author']['login'])
     end_reached = False
     for i in range(len(weeks) - 1, -1, -1):
         week = weeks[i]
@@ -45,7 +48,7 @@ data.reverse()
 total_commits *= 2 # Account for merges
 
 commits = []
-for i in range(int(total_commits // 100)):
+for i in range(int(math.ceil(total_commits / 100))):
     r = requests.get(base_url + '/repos/{0}/{1}/commits?per_page=100&page={2}'.format(username, repository, i), auth=auth)
     commits += r.json()
 
@@ -65,11 +68,18 @@ while current <= end_date:
     months.append(current.strftime("%B"))
     current += relativedelta.relativedelta(months=1)
 
+contributors_string = ''
+for i in range(len(contributors)):
+    contributors_string += contributors[i]
+    if i != len(contributors) - 1:
+        contributors_string += ', '
+
 summary = {
     'title': repository,
     'total': len(commits),
     'data': data,
-    'months': months
+    'months': months,
+    'contributors': contributors_string
 }
 
 output = template.render(
@@ -80,5 +90,5 @@ output = template.render(
 )
 
 # to save the results
-with open("my_new_file.html", "w") as fh:
+with open(repository + ".html", "w") as fh:
     fh.write(output)
